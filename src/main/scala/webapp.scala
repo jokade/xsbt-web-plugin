@@ -8,7 +8,7 @@ import java.util.jar.Manifest
 trait WebappPlugin {
 
   lazy val webapp        = config("webapp").hide
-  lazy val webappSrc     = TaskKey[File]("src")
+  lazy val webappSrcDirectories     = TaskKey[Seq[File]]("src directories")
   lazy val webappDest    = TaskKey[File]("dest")
   lazy val prepareWebapp = TaskKey[Seq[(sbt.File, String)]]("prepare")
   lazy val postProcess   = TaskKey[java.io.File => Unit]("post-process")
@@ -19,7 +19,7 @@ trait WebappPlugin {
      , packagedArtifact in (Compile, packageBin)
      , mappings in (Compile, packageBin)
      , webInfClasses in webapp
-     , webappSrc in webapp
+     , webappSrcDirectories in webapp
      , webappDest in webapp
      , fullClasspath in Runtime
     ) map {
@@ -27,12 +27,12 @@ trait WebappPlugin {
             , (art, file)
             , mappings
             , webInfClasses
-            , webappSrc
+            , webappSrcDirectories
             , webappDest
             , fullClasspath
       ) =>
 
-        IO.copyDirectory(webappSrc, webappDest)
+        webappSrcDirectories.foreach( IO.copyDirectory(_, webappDest) )
 
         val webInfDir = webappDest / "WEB-INF"
         val webappLibDir = webInfDir / "lib"
@@ -86,12 +86,12 @@ trait WebappPlugin {
 
   lazy val webappSettings: Seq[Setting[_]] =
     Seq(
-        webappSrc      <<= (sourceDirectory in Compile) map { _ / "webapp" }
+        webappSrcDirectories <<= (sourceDirectory in Compile) map { d => Seq(d / "webapp") }
       , webappDest     <<= (target in Compile) map { _ / "webapp" }
       , prepareWebapp  <<= prepareWebappTask
       , postProcess     := { _ => () }
       , webInfClasses   := false
-      , watchSources <++= (webappSrc in webapp) map { d => (d ** "*").get }
+      , watchSources <++= (webappSrcDirectories in webapp) map { d => d.flatMap( x => (x ** "*").get) }
     )
 
 }
